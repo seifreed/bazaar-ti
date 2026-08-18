@@ -1,0 +1,136 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+env:
+  # Both jobs must install the same interpreter: the gates below check the
+  # source that the other job then runs, so a mismatch would have them
+  # disagreeing about the language. Written out per job it was the same string
+  # four times, with nothing making the two agree.
+  #
+  # Not read from pyproject's requires-python, which setup-python does accept:
+  # it normalizes the value through semver.validRange, so ">=3.14" is an open
+  # range and resolves to the newest Python satisfying it. That would drift off
+  # the exact version black, ruff and mypy target here.
+  PYTHON_VERSION: "3.14"
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python ${{ env.PYTHON_VERSION }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Build and install wheel
+        run: |
+          python -m pip install --upgrade pip
+          pip install ".[dev]" build twine
+          python -m pip wheel . --no-deps --wheel-dir dist
+          python -m pip install --force-reinstall --no-deps dist/*.whl
+
+      - name: Test installed wheel
+        run: python -m pytest --cov=bazaar_ti --cov-report=term-missing
+
+      # The wheel above is built from a package list; the source archive is
+      # built from the checkout, so it is the one that picks up whatever else
+      # a working tree happens to hold. It went out once at 2.5 MB carrying a
+      # local code-index database, and nothing here would have noticed: this
+      # job never built it. twine check reads the metadata both artifacts
+      # carry to PyPI, which nothing checked either.
+      - name: Build and check both artifacts
+        run: |
+          rm -rf dist
+          python -m build
+          python -m twine check dist/*
+          python - <<'EOF'
+          import sys, tarfile
+          from pathlib import Path
+
+          archive = next(Path("dist").glob("*.tar.gz"))
+          names = [m.name for m in tarfile.open(archive).getmembers() if m.isfile()]
+          stray = sorted(
+              {n.split("/")[1] for n in names if "/" in n}
+              - {"src", "tests", "README.md", "LICENSE", "pyproject.toml", "PKG-INFO", ".gitignore"}
+          )
+          size = archive.stat().st_size
+          print(f"{archive.name}: {len(names)} files, {size / 1024:.0f} KB")
+          if stray:
+              sys.exit(f"source archive carries {stray}")
+          if size > 512 * 1024:
+              sys.exit(f"source archive is {size / 1024:.0f} KB; it holds more than the project")
+          EOF
+
+  # Formatting, typing and the security gates read the same source whatever the
+  # runner, so they run once.
+  quality:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python ${{ env.PYTHON_VERSION }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+
+      - name: black
+        run: black --check .
+
+      - name: ruff
+        run: ruff check .
+
+      - name: mypy
+        run: mypy
+
+      - name: bandit
+        run: bandit -r src -q
+
+      - name: pip-audit
+        run: pip-audit
+
+  # Behaviour does vary by platform: the config file lives somewhere else on
+  # Windows, stdout there defaults to the ANSI code page, and the hash lists
+  # this reads arrive BOM-prefixed from Windows editors. All of that was
+  # written for systems the suite had never run on.
+  test:
+    name: test (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-latest # Linux x64
+          - ubuntu-24.04-arm # Linux ARM
+          - macos-latest # macOS ARM
+          - macos-13 # macOS x64
+          - windows-latest # Windows x64
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python ${{ env.PYTHON_VERSION }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+
+      - name: pytest (100% coverage enforced)
+        run: pytest --cov=bazaar_ti --cov-report=term-missing

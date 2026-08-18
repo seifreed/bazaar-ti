@@ -1,0 +1,94 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "bazaar-ti"
+version = "0.1.0"
+description = "Full async/sync client and CLI for the abuse.ch APIs (MalwareBazaar, URLhaus, ThreatFox, YARAify, Hunting)."
+readme = "README.md"
+requires-python = ">=3.14"
+license = "MIT"
+authors = [{ name = "Marc R." }]
+keywords = ["abuse.ch", "malwarebazaar", "urlhaus", "threatfox", "yaraify", "threat-intelligence"]
+classifiers = [
+    "Programming Language :: Python :: 3.14",
+    "Operating System :: OS Independent",
+    "Topic :: Security",
+]
+dependencies = ["httpx>=0.27"]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8",
+    "pytest-asyncio>=0.23",
+    "pytest-cov>=5",
+    "black>=24",
+    "ruff>=0.6",
+    "mypy>=1.11",
+    "bandit>=1.7",
+    "pip-audit>=2.7",
+]
+
+[project.scripts]
+bazaar-ti = "bazaar_ti.cli.main:main"
+
+[project.urls]
+Homepage = "https://github.com/seifreed/bazaar-ti"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/bazaar_ti"]
+
+# An allowlist, because the default is "everything git does not ignore" and
+# this checkout holds more than the project: the source archive went out at
+# 2.5 MB carrying a 7.9 MB local code-index database, a hypothesis cache and
+# two editors' rule files — none of it needed to build or test the package,
+# and the index names paths from the machine that built it. Tests are kept:
+# a downstream packager builds from this and runs them.
+[tool.hatch.build.targets.sdist]
+include = ["src", "tests", "README.md", "LICENSE", "pyproject.toml"]
+
+[tool.black]
+line-length = 100
+target-version = ["py314"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py314"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+# "S" is flake8-bandit: 107 security rules, over src and tests alike. bandit
+# itself still runs, but only over src, so until now half the project had no
+# security analysis at all.
+select = ["E", "F", "I", "N", "UP", "B", "SIM", "C4", "PL", "S"]
+
+[tool.ruff.lint.per-file-ignores]
+# S101 warns that `assert` disappears under `python -O`. A test is assertions,
+# and nothing here runs under -O, so the rule does not apply to this directory.
+# The other 106 security rules do — this narrows one rule to where it belongs
+# rather than silencing a finding.
+"tests/*" = ["S101"]
+
+[tool.mypy]
+python_version = "3.14"
+strict = true
+files = ["src", "tests"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+# Unset, pytest-asyncio warns that a future release changes this default, and
+# the async half of every service client would quietly start running under a
+# different loop scope. There are no async fixtures here today; naming the
+# scope the project already relies on keeps it that way through an upgrade.
+asyncio_default_fixture_loop_scope = "function"
+testpaths = ["tests"]
+markers = ["live: test hits the live abuse.ch API and requires BAZAAR_TI_AUTH_KEY"]
+
+[tool.coverage.run]
+branch = true
+source = ["bazaar_ti"]
+
+[tool.coverage.report]
+fail_under = 100
+show_missing = true
