@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "bazaar-ti"
-version = "0.1.0"
+dynamic = ["version"]
 description = "Full async/sync client and CLI for the abuse.ch APIs (MalwareBazaar, URLhaus, ThreatFox, YARAify, Hunting)."
 readme = "README.md"
 requires-python = ">=3.14"
@@ -35,6 +35,12 @@ bazaar-ti = "bazaar_ti.cli.main:main"
 
 [project.urls]
 Homepage = "https://github.com/seifreed/bazaar-ti"
+
+# Read from the module rather than written out here. Two literals saying
+# "0.1.0" is one release away from a wheel whose metadata and whose
+# __version__ disagree, and a version on PyPI cannot be re-uploaded.
+[tool.hatch.version]
+path = "src/bazaar_ti/_version.py"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/bazaar_ti"]

@@ -5,6 +5,9 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+  # release.yml calls this file rather than repeating the matrix, so a tag
+  # cannot publish something the gates never ran on.
+  workflow_call:
 
 permissions:
   contents: read

@@ -1,0 +1,21 @@
+venv/
+__pycache__/
+*.pyc
+*.egg-info/
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+.hypothesis/
+.coverage
+dist/
+build/
+
+# Local secrets / credentials — never commit an Auth-Key
+.env
+config.toml
+*.key
+*.pem
+
+# Local code index and editor rules, not the project
+.codegraph/
+.cursor/

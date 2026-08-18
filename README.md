@@ -302,6 +302,28 @@ Contributions are welcome.
 All changes must pass the quality gates with no suppressions: `black --check .`,
 `ruff check .`, `mypy`, `bandit -r src`, `pip-audit`, and `pytest` at 100% coverage.
 
+CI runs the suite on Ubuntu, macOS and Windows (x64 and ARM) on every push and
+pull request.
+
+## Releasing
+
+The version lives in one place, `src/bazaar_ti/_version.py`; the package
+metadata reads it. To publish, bump it, commit, then push a matching tag:
+
+```bash
+git tag v0.2.0 && git push origin v0.2.0
+```
+
+That runs the full CI matrix and, only if it passes, publishes to PyPI through
+[trusted publishing](https://docs.pypi.org/trusted-publishers/) — the job mints
+a short-lived OIDC token, so no API token is stored in the repository. It needs
+two one-time settings:
+
+- On PyPI, a trusted publisher for this project: owner `seifreed`, repository
+  `bazaar-ti`, workflow `release.yml`, environment `pypi`.
+- On GitHub, an environment named `pypi` (Settings → Environments), optionally
+  with a required reviewer so a tag waits for approval before uploading.
+
 ---
 
 ## Support the Project
